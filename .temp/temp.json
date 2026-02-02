@@ -1,0 +1,25 @@
+{
+  "projectPath": "/Users/zhanglizhong/rebell/ai/merchant-service/merchant-dao/rebell-dao-common/src/main/java/com/rebell/model/mysql",
+  "patchDTOS": [
+    {
+      "path": "GuideTaskFlow.java",
+      "isNew": true,
+      "edits": [
+        {
+          "type": "new_file",
+          "content": "package com.rebell.model.mysql;\n\n\nimport com.rebell.enums.TemplatePlanType;\nimport lombok.Getter;\nimport lombok.Setter;\n\nimport jakarta.persistence.CascadeType;\nimport jakarta.persistence.Column;\nimport jakarta.persistence.Entity;\nimport jakarta.persistence.EnumType;\nimport jakarta.persistence.Enumerated;\nimport jakarta.persistence.GeneratedValue;\nimport jakarta.persistence.GenerationType;\nimport jakarta.persistence.Id;\nimport jakarta.persistence.JoinColumn;\nimport jakarta.persistence.OneToMany;\nimport jakarta.persistence.OneToOne;\nimport jakarta.persistence.Table;\nimport org.hibernate.annotations.Comment;\nimport java.util.List;\n\n/**\n * @author lizhong.zhang@yituishui.com\n * @since 2025/7/22\n */\n\n@Entity\n@Table(name = \"guide_task_flow\")\n@Comment(\"引导任务流程表\")\n@Getter\n@Setter\npublic class GuideTaskFlow extends BaseModel {\n\n    @Id\n    @GeneratedValue(strategy = GenerationType.IDENTITY)\n    @Column(columnDefinition = \"bigint comment '主键ID'\")\n    private Long id;\n\n\n    @Column(nullable = false, columnDefinition = \"tinyint(1) comment '是否完成'\")\n    private boolean isComplete = false;\n\n    @OneToOne\n    @JoinColumn(name = \"user_id\")\n    @Column(columnDefinition = \"bigint comment '用户ID'\")\n    private User user;\n\n    @Enumerated(EnumType.STRING)\n    @Column(columnDefinition = \"varchar(50) comment '模板计划类型'\")\n    private TemplatePlanType templatePlanType;\n\n    @OneToMany(mappedBy = \"guideTaskFlow\", cascade = CascadeType.ALL)\n    private List<GuideTask> tasks;\n\n\n}\n"
+        }
+      ]
+    },
+    {
+      "path": "GuideTask.java",
+      "isNew": true,
+      "edits": [
+        {
+          "type": "new_file",
+          "content": "package com.rebell.model.mysql;\n\n\nimport com.rebell.enums.GuideTaskEnum;\nimport lombok.Getter;\nimport lombok.Setter;\n\nimport jakarta.persistence.Entity;\nimport jakarta.persistence.EnumType;\nimport jakarta.persistence.Enumerated;\nimport jakarta.persistence.FetchType;\nimport jakarta.persistence.GeneratedValue;\nimport jakarta.persistence.GenerationType;\nimport jakarta.persistence.Id;\nimport jakarta.persistence.JoinColumn;\nimport jakarta.persistence.ManyToOne;\nimport jakarta.persistence.Table;\nimport jakarta.persistence.Column;\nimport org.hibernate.annotations.Comment;\n\n/**\n * mdp新建template/storefront任务总表\n * @author lizhong.zhang@yituishui.com\n * @since 2025/7/22\n */\n\n@Entity\n@Table(name = \"guide_task\")\n@Comment(\"引导任务表\")\n@Getter\n@Setter\npublic class GuideTask extends BaseModel {\n\n    @Id\n    @GeneratedValue(strategy = GenerationType.IDENTITY)\n    @Column(columnDefinition = \"bigint comment '主键ID'\")\n    private Long id;\n\n    @ManyToOne(fetch = FetchType.LAZY)\n    @JoinColumn(name = \"guide_task_flow_id\")\n    @Column(columnDefinition = \"bigint comment '引导任务流程ID'\")\n    private GuideTaskFlow guideTaskFlow;\n\n    @Enumerated(EnumType.STRING)\n    @Column(columnDefinition = \"varchar(50) comment '任务类型'\")\n    private GuideTaskEnum task;\n\n    @Column(columnDefinition = \"int comment '排序号'\")\n    private Integer sortNo;\n\n    @Column(columnDefinition = \"tinyint(1) comment '是否完成'\")\n    private boolean isComplete = false;\n\n    @Column(columnDefinition = \"varchar(50) comment '用户UUID'\")\n    private String userUuid;\n}\n"
+        }
+      ]
+    }
+  ]
+}

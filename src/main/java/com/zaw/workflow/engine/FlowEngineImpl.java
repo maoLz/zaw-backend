@@ -5,21 +5,27 @@ import com.zaw.workflow.enums.ActionType;
 import com.zaw.workflow.enums.ExecutorStatus;
 import com.zaw.workflow.enums.ExecutorType;
 import com.zaw.workflow.enums.FlowInstanceStatus;
-import com.zaw.workflow.enums.FlowOperationType;
 import com.zaw.workflow.enums.NodeType;
 import com.zaw.workflow.dto.FlowExecContext;
+import com.zaw.workflow.engine.config.HttpNodeConfig;
+import com.zaw.workflow.engine.config.NodeConfig;
 import com.zaw.workflow.engine.exec.NodeExecutor;
 import com.zaw.workflow.engine.exec.NodeExecutorRegistry;
 import com.zaw.workflow.engine.strategy.*;
 import com.zaw.workflow.engine.util.JsonExtractor;
 import com.zaw.workflow.repository.*;
-import com.zaw.workflow.web.FlowExecRequest;
+
+import cn.hutool.core.collection.CollectionUtil;
+
+import com.alibaba.fastjson2.JSONObject;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
+import org.checkerframework.checker.units.qual.m;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -27,48 +33,30 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class FlowEngineImpl implements FlowEngine {
+public class FlowEngineImpl {
 
     private final FlowInstanceRepository flowInstanceRepository;
     private final NodeExecutorRecordRepository nodeExecutorRecordRepository;
     private final NodeExecutorRegistry nodeExecutorRegistry;
     private final NodeExecutionStrategyFactory nodeExecutionStrategyFactory;
 
-    @Override
-    public FlowInstance start(FlowExecRequest request) {
-        NodeExecutionStrategy strategy = nodeExecutionStrategyFactory.getStrategy(FlowOperationType.START);
-        FlowExecContext context = strategy.prepareContext(request);
-        context.setRequest(request);
-        FlowInstance instance = strategy.loadInstance(context);
-        FlowNode current = strategy.loadCurrentNode(context);
-
-        return run(instance, current, context, strategy);
-    }
-
-
-
-    @Override
-    public FlowInstance continueTask(FlowExecRequest request) {
-        NodeExecutionStrategy strategy = nodeExecutionStrategyFactory.getStrategy(FlowOperationType.CONTINUE);
-        FlowExecContext context = strategy.prepareContext(request);
-        context.setRequest(request);
-        FlowInstance instance = strategy.loadInstance(context);
-        FlowNode current = strategy.loadCurrentNode(context);
-        context.setCurrentNode(current);
-        return run(instance, current, context, strategy);
-    }
-
-    private FlowInstance run(FlowInstance instance, FlowNode current, FlowExecContext context, NodeExecutionStrategy strategy) {
+    @Async("asyncExecutor")
+    public void run(Long instanceId, FlowNode current, FlowExecContext context,
+            NodeExecutionStrategy strategy) {
+        FlowInstance instance = flowInstanceRepository.findById(instanceId).orElse(null);
+        context.setFlowInstance(instance);
+        instance.setFlowNodeNumber(context.getNodes().size());
         while (true) {
+            instance.setRunNodeNumber(instance.getRunNodeNumber()+1);
             NodeExecutorRecord record = null;
-            if(instance.getStatus() == FlowInstanceStatus.WAITING || instance.getStatus() == FlowInstanceStatus.FAILED){
+            if (instance.getStatus() == FlowInstanceStatus.WAITING
+                    || instance.getStatus() == FlowInstanceStatus.FAILED) {
                 record = context.getCurrentRecord();
                 instance.setStatus(FlowInstanceStatus.RUNNING);
-            }else{
+            } else {
                 record = createRecord(instance, current);
             }
             context.setCurrentRecord(record);
-
 
             String output = "";
             try {
@@ -76,10 +64,10 @@ public class FlowEngineImpl implements FlowEngine {
                 if (current.getNodeType() == NodeType.TASK) {
                     NodeExecutor executor = nodeExecutorRegistry.getRequired(current.getExecutorType());
                     output = executor.execute(context);
-                    if(StringUtils.isNotBlank(output)) {
+                    if (StringUtils.isNotBlank(output)) {
                         mergeContext(instance, current, output);
                     }
-                }else{
+                } else {
                     record.setStatus(ExecutorStatus.SUCCESS);
                 }
             } catch (Exception e) {
@@ -89,33 +77,33 @@ public class FlowEngineImpl implements FlowEngine {
                 record.setEndTime(new Date());
                 log.error(e.getMessage(), e);
                 failInstance(instance, e.getMessage());
-                return instance;
+                return;
             } finally {
-                 nodeExecutorRecordRepository.save(record);
+                nodeExecutorRecordRepository.save(record);
             }
 
             if (current.getNodeType() == NodeType.END) {
                 instance.setStatus(FlowInstanceStatus.SUCCESS);
                 instance.setEndTime(new Date());
                 flowInstanceRepository.save(instance);
-                return instance;
+                return;
             }
             List<FlowEdge> edges = context.getEdges();
             Map<Long, FlowNode> nodeByKey = context.getNodeMap();
-            if(current.getExecutorType() == ExecutorType.HUMAN){
-                if(record.getStatus() == ExecutorStatus.WAITING){
+            if (current.getExecutorType() == ExecutorType.HUMAN) {
+                if (record.getStatus() == ExecutorStatus.WAITING) {
                     instance.setStatus(FlowInstanceStatus.WAITING);
                     flowInstanceRepository.save(instance);
-                    return instance;
-                }else if(record.getStatus() == ExecutorStatus.SUCCESS){
-                    if(record.getAction() == ActionType.END){
+                    return;
+                } else if (record.getStatus() == ExecutorStatus.SUCCESS) {
+                    if (record.getAction() == ActionType.END) {
                         instance.setStatus(FlowInstanceStatus.SUCCESS);
                         instance.setEndTime(new Date());
                         flowInstanceRepository.save(instance);
-                        return instance;
-                    }else if(record.getAction() == ActionType.GOTO){
+                        return;
+                    } else if (record.getAction() == ActionType.GOTO) {
                         current = context.getNodeMap().get(record.getNextNodeId());
-                        current = pickNextFromMultiple(current, edges, nodeByKey,record.getNodeKey());
+                        current = pickNextFromMultiple(current, edges, nodeByKey, record.getNodeKey());
                         context.setCurrentNode(current);
                         continue;
                     }
@@ -128,7 +116,7 @@ public class FlowEngineImpl implements FlowEngine {
                 instance.setStatus(FlowInstanceStatus.SUCCESS);
                 instance.setEndTime(new Date());
                 flowInstanceRepository.save(instance);
-                return instance;
+                return;
             }
             current = next;
         }
@@ -142,15 +130,13 @@ public class FlowEngineImpl implements FlowEngine {
                 .orElse(null);
     }
 
-    public static FlowNode pickNextFromMultiple(FlowNode current
-            , List<FlowEdge> edges
-            , Map<Long, FlowNode> nodeByKey
-            , String gotoNodeKey) {
+    public static FlowNode pickNextFromMultiple(FlowNode current, List<FlowEdge> edges, Map<Long, FlowNode> nodeByKey,
+            String gotoNodeKey) {
         return edges.stream()
                 .filter(e -> Objects.equals(e.getFromNodeId(), current.getId()))
                 .map(e -> nodeByKey.get(e.getToNodeId()))
                 .filter(n -> Objects.equals(n.getNodeKey(), gotoNodeKey))
-                .findFirst().orElseThrow(()-> new RuntimeException("goto node not found"));
+                .findFirst().orElseThrow(() -> new RuntimeException("goto node not found"));
     }
 
     private NodeExecutorRecord createRecord(FlowInstance instance, FlowNode node) {
@@ -167,6 +153,7 @@ public class FlowEngineImpl implements FlowEngine {
     private void failInstance(FlowInstance instance, String message) {
         instance.setStatus(FlowInstanceStatus.FAILED);
         instance.setEndTime(new Date());
+        instance.setErrorMessage(message);
         log.error(message);
         flowInstanceRepository.save(instance);
     }
@@ -174,8 +161,7 @@ public class FlowEngineImpl implements FlowEngine {
     private void mergeContext(
             FlowInstance instance,
             FlowNode node,
-            String outputJson
-    ) {
+            String outputJson) {
         try {
             ObjectMapper mapper = new ObjectMapper();
 
@@ -183,23 +169,37 @@ public class FlowEngineImpl implements FlowEngine {
             JsonNode root = instance.getContext() == null
                     ? mapper.createObjectNode()
                     : mapper.readTree(instance.getContext());
-
             ObjectNode context = (ObjectNode) root;
+            
+            ObjectNode output = StringUtils.isBlank(instance.getOutput())?
+                mapper.createObjectNode(): (ObjectNode) mapper.readTree(instance.getOutput());
 
             JsonNode outputNode = mapper.readTree(outputJson);
 
             // 3. outputMapping（可选）
             if (node.getConfig() != null) {
-                JsonNode cfg = mapper.readTree(node.getConfig());
-                if (cfg.has("outputMapping")) {
-                    JsonNode mapping = cfg.get("outputMapping");
-                    mapping.fields().forEachRemaining(e -> {
-                        JsonNode v = JsonExtractor.extract(outputNode, e.getValue().asText());
+                NodeConfig config = JSONObject.parseObject(node.getConfig(), NodeConfig.class);
+                Map<String, String> outputMapping = config.getOutputMapping();
+                if (CollectionUtil.isNotEmpty(outputMapping)) {
+                    outputMapping.entrySet().forEach(e->{
+                        JsonNode v = JsonExtractor.extract(outputNode, e.getValue());
                         if (!v.isMissingNode()) {
                             context.set(e.getKey(), v);
                         }
                     });
                 }
+                Map<String,String> flowOutput = config.getFlowOutput();
+                if(CollectionUtil.isNotEmpty(flowOutput)){
+                    flowOutput.entrySet().forEach(e->{
+                        JsonNode v = JsonExtractor.extract(outputNode, e.getValue());
+                        if (!v.isMissingNode()) {
+                            output.set(e.getKey(),v);
+                        }
+                    });
+                }
+
+                JsonNode cfg = mapper.readTree(node.getConfig());
+
                 if (cfg.has("formSchema")) {
                     JsonNode formSchema = cfg.get("formSchema");
                     formSchema.elements().forEachRemaining(e -> {
@@ -212,8 +212,10 @@ public class FlowEngineImpl implements FlowEngine {
                     });
                 }
             }
+       
 
             instance.setContext(mapper.writeValueAsString(context));
+            instance.setOutput(mapper.writeValueAsString(output));
 
         } catch (Exception e) {
             e.printStackTrace();

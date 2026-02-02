@@ -6,7 +6,7 @@ import com.zaw.workflow.web.FlowExecRequest;
 public interface FlowEngine {
 
 
-    FlowInstance start(FlowExecRequest request);
+    void start(FlowExecRequest request);
 
 
     FlowInstance continueTask(FlowExecRequest request);

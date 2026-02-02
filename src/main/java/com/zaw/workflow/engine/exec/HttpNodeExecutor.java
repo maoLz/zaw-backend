@@ -60,12 +60,14 @@ public class HttpNodeExecutor implements NodeExecutor {
 
         // -------- headers --------
         HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
         if(CollectionUtil.isNotEmpty(cfg.getHeaders())){
             for (Map.Entry<String, String> e : cfg.getHeaders().entrySet()) {
                 String value = resolve(e.getValue(), contextNode);
                 headers.add(e.getKey(), value);
             }
+        }
+        if(!headers.containsKey("Content-Type")){
+            headers.setContentType(MediaType.APPLICATION_JSON);
         }
 
         // -------- params --------
@@ -131,8 +133,9 @@ public class HttpNodeExecutor implements NodeExecutor {
         ObjectNode result = objectMapper.createObjectNode();
         result.put("status", resp.getStatusCode().value());
         String res = resp.getBody();
+        JSONObject resultObject = JSONObject.parse(res);
         try {
-            record.setOutput(JSONObject.parse(res).toString());
+            record.setOutput(resultObject.toString());
         }catch (Exception e){
             record.setOutput(res);
         }
@@ -140,6 +143,10 @@ public class HttpNodeExecutor implements NodeExecutor {
             result.set("body", objectMapper.readTree(res));
         } catch (Exception e) {
             result.put("body", resp.getBody());
+        }
+        if(resultObject.getInteger("code") != 0){
+            record.setStatus(ExecutorStatus.FAILED);
+            throw new RuntimeException("Http node execute failed: " + resultObject.getString("message"));
         }
         record.setStatus(ExecutorStatus.SUCCESS);
         return result.toString();

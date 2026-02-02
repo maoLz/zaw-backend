@@ -15,4 +15,6 @@ public class NodeConfig {
 
     private Map<String,String> outputMapping;
 
+    private Map<String,String> flowOutput;
+
 }

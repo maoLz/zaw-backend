@@ -83,4 +83,5 @@ public class Flow extends BaseModel {
      */
     @Column(name = "context_config", columnDefinition = "TEXT")
     private String contextConfig;
+
 }

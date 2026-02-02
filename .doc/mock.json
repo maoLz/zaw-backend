@@ -1,0 +1,18 @@
+{
+  "code": 0,
+  "data": {
+    "patches": [
+      {
+        "path": "src/main/java/com/rebell/message/enums/MessageTemplateEnums.java",
+        "edits": [
+          {
+            "type": "insert_after",
+            "anchor": "    email_contract_contractInvited(\"email_contract_contractInvited\"),",
+            "content": "\n    email_iban_ibanChangeRequest(\"email_iban_ibanChangeRequest\"),"
+          }
+        ],
+        "isNew": "false"
+      }
+    ]
+  }
+}

@@ -16,9 +16,13 @@ import com.zaw.workflow.repository.FlowNodeRepository;
 import com.zaw.workflow.repository.FlowRepository;
 import com.zaw.workflow.web.FlowCanvasRequest;
 import com.zaw.workflow.web.FlowCanvasResult;
+
+import cn.hutool.core.util.IdUtil;
+
 import com.zaw.workflow.web.CreateFlowEdgeRequest;
 import com.zaw.workflow.web.CreateFlowNodeRequest;
 import com.zaw.workflow.web.CreateFlowRequest;
+import com.zaw.workflow.web.UpdateFlowRequest;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -140,6 +144,42 @@ public class FlowService {
     }
 
     /**
+     * 更新流程
+     *
+     * @param id      流程ID
+     * @param request 更新请求
+     * @return 流程实体
+     */
+    public Flow update(Long id, UpdateFlowRequest request) {
+        // 第一步：查询流程
+        Flow flow = flowRepository.findById(id).orElse(null);
+        if (flow == null) {
+            // 流程不存在时抛出业务异常
+            throw new BizException("流程不存在");
+        }
+        // 第二步：更新流程字段
+        FlowMapper.updateEntity(flow, request);
+        // 第三步：保存并返回
+        return flowRepository.save(flow);
+    }
+
+    /**
+     * 更新流程上下文配置
+     *
+     * @param id            流程ID
+     * @param contextConfig 上下文配置（JSON）
+     * @return 更新后的流程实体
+     */
+    public Flow updateFlowContext(Long id, String contextConfig) {
+        Flow flow = flowRepository.findById(id).orElse(null);
+        if (flow == null) {
+            throw new BizException("流程不存在");
+        }
+        flow.setContextConfig(contextConfig);
+        return flowRepository.save(flow);
+    }
+
+    /**
      * 发布流程
      *
      * @param id 流程ID
@@ -176,7 +216,7 @@ public class FlowService {
         // 第三步：复制流程基础信息
         Flow cloned = new Flow();
         cloned.setName(source.getName());
-        cloned.setCode(source.getCode());
+        cloned.setCode(source.getCode()+"_"+IdUtil.fastUUID());
         cloned.setDescription(source.getDescription());
         cloned.setContextConfig(source.getContextConfig());
         cloned.setStatus(FlowStatus.DRAFT);

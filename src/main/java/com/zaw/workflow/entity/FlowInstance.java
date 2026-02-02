@@ -47,5 +47,12 @@ public class FlowInstance extends BaseModel {
     @Column(columnDefinition = "text")
     private String output;
 
+    private Integer runNodeNumber = 0;
+
+    private Integer flowNodeNumber = 0;
+
+    @Column(columnDefinition = "text")
+    private String errorMessage;
+
 
 }

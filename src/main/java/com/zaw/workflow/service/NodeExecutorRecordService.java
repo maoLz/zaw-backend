@@ -11,6 +11,7 @@ import com.zaw.workflow.repository.FlowEdgeRepository;
 import com.zaw.workflow.repository.FlowNodeRepository;
 import com.zaw.workflow.repository.NodeExecutorRecordRepository;
 import com.zaw.workflow.web.HumanInfoResponse;
+import com.zaw.workflow.web.NodeExecutorRecordSimpleResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -80,6 +81,15 @@ public class NodeExecutorRecordService {
      */
     public List<NodeExecutorRecord> listByFlowInstanceId(Long flowInstanceId) {
         return nodeExecutorRecordRepository.findByFlowInstanceIdOrderByIdAsc(flowInstanceId);
+    }
+
+    /**
+     * 获取执行记录简单字段列表
+     * @param flowInstanceId 实例ID
+     * @return 简单字段列表
+     */
+    public List<NodeExecutorRecordSimpleResponse> listSimpleByFlowInstanceId(Long flowInstanceId) {
+        return nodeExecutorRecordRepository.findSimpleByFlowInstanceIdOrderByIdAsc(flowInstanceId);
     }
 
     /**

@@ -3,17 +3,20 @@ package com.zaw.workflow.controller;
 
 import com.zaw.common.web.R;
 import com.zaw.workflow.engine.FlowEngine;
+import com.zaw.workflow.engine.FlowEngineRunService;
 import com.zaw.workflow.entity.Flow;
 import com.zaw.workflow.entity.FlowInstance;
 import com.zaw.workflow.service.FlowInstanceService;
 import com.zaw.workflow.service.FlowService;
 import com.zaw.workflow.web.CreateFlowRequest;
 import com.zaw.workflow.web.FlowExecRequest;
+import com.zaw.workflow.web.UpdateFlowRequest;
 
 import lombok.AllArgsConstructor;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -35,7 +38,7 @@ public class FlowController {
 
     private final FlowInstanceService flowInstanceService;
 
-    private final FlowEngine flowEngine;
+    private final FlowEngineRunService  flowEngineRunService;
 
     /**
      * 创建草稿流程
@@ -45,6 +48,17 @@ public class FlowController {
     @PostMapping
     public R<Flow> create(@RequestBody CreateFlowRequest request) {
         return R.ok(flowService.create(request));
+    }
+
+    /**
+     * 更新流程
+     * @param id 流程ID
+     * @param request 更新流程请求
+     * @return 流程实体
+     */
+    @PutMapping("/{id}")
+    public R<Flow> update(@PathVariable Long id, @RequestBody UpdateFlowRequest request) {
+        return R.ok(flowService.update(id, request));
     }
 
     /**
@@ -102,7 +116,7 @@ public class FlowController {
      * @param flowId
      * @return
      */
-     @GetMapping("/{flowId}/latest-instance-input")
+    @GetMapping("/{flowId}/latest-instance-input")
     public R<String> getLatestInstanceInput(@PathVariable Long flowId) {
         FlowInstance latestInstance = flowInstanceService.getLatestByFlowId(flowId);
         if (latestInstance != null) {
@@ -118,12 +132,16 @@ public class FlowController {
      */
     @PostMapping("/start")
     public R<FlowInstance> start(@RequestBody FlowExecRequest req) {
-        return
-                R.ok(flowEngine.start(req));
+        flowEngineRunService.start(req);
+        return R.ok();
     }
 
     @PostMapping("/continueTask")
     public R<FlowInstance> continueTask(@RequestBody FlowExecRequest req) {
-        return R.ok(flowEngine.continueTask(req));
+        flowEngineRunService.continueTask(req);
+        return R.ok();
     }
+
+    
+
 }
